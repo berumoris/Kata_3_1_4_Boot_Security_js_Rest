@@ -1,68 +1,73 @@
 package ru.kata.spring.boot_security.demo.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
-import ru.kata.spring.boot_security.demo.model.Role;
 import ru.kata.spring.boot_security.demo.model.User;
-import ru.kata.spring.boot_security.demo.service.UserService;
-import java.util.List;
+import ru.kata.spring.boot_security.demo.service.UserServiceImp;
+import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping
+@RequiredArgsConstructor
 public class UserController {
 
-    private final UserService userService;
-    Authentication authentication;
-
-    @Autowired
-    public UserController(UserService userService) {
-        this.userService = userService;
-    }
+    private final UserServiceImp userService;
 
     @GetMapping("/admin")
     public String getAllUsers(Model model) {
-        List<User> users = userService.findAllUsers();
-        model.addAttribute("users", users);
-        return "index";
+        model.addAttribute("users", userService.findAllUsers());
+        return "admin";
     }
 
     @GetMapping("/admin/new")
-    public String crateUserForm(User user) {
+    public String newUser(@ModelAttribute("user") User user) {
         return "new";
     }
 
     @PostMapping("/admin")
-    public String crateUser(User user) {
+    public String addNewUser(@ModelAttribute User user,
+                             @RequestParam(required = false) String[] role) {
         userService.saveUser(user);
+        if (role != null) {
+            for (String r : role) {
+                userService.setUserRole(user.getEmail(), r);
+            }
+        }
         return "redirect:/admin";
     }
 
     @GetMapping("/admin/{id}/edit")
-    public String edit(Model model, @PathVariable("id") Long id) {
-        model.addAttribute("user", userService.getUser(id));
+    public String editUser(@PathVariable("id") Long id, Model model) {
+        User user = userService.getUserById(id);
+        model.addAttribute("user", user);
+        model.addAttribute("roles", user.getRoles().stream().map(x -> x.getNameRole()).collect(Collectors.toSet()));
         return "edit";
     }
 
     @PatchMapping("/admin/{id}")
-    public String update(@ModelAttribute("user") User user, @PathVariable("id") Long id) {
-        userService.saveUser(user);
+    public String updateUser(@ModelAttribute User user,
+                             @RequestParam(required = false) String[] role) {
+        userService.updateUser(user);
+        if (role != null) {
+            for (String rl: role) {
+                userService.setUserRole(user.getEmail(), rl);
+            }
+        }
         return "redirect:/admin";
     }
 
     @DeleteMapping("/admin/{id}")
-    public String delete(@PathVariable("id") Long id) {
+    public String deleteUser(@PathVariable("id") Long id) {
         userService.deleteUser(id);
         return "redirect:/admin";
     }
 
     @GetMapping("/user")
-    public String getUserByEmail(Model model) {
-        List<User> users = userService.findAllUsers();
-        model.addAttribute("users", users);
+    public String getUser(Model model, Authentication authentication) {
+        model.addAttribute("users", userService.getUserByEmail(authentication.getName()));
         return "user";
     }
 }
